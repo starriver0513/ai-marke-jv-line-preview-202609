@@ -55,6 +55,7 @@
         button.setAttribute("aria-label", message.asset.name + "を拡大表示");
         const img = node("img");
         img.src = message.asset.path; img.alt = message.asset.name;
+        img.width = message.asset.width; img.height = message.asset.height;
         img.loading = "lazy"; img.decoding = "async";
         button.append(img, node("span", "image-zoom-hint", "拡大"));
         button.addEventListener("click", () => {
