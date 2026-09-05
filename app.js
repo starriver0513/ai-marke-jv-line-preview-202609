@@ -1,238 +1,102 @@
 (function () {
   "use strict";
-
   const data = window.LINE_PREVIEW_DATA;
-  if (!data || !Array.isArray(data.channels) || data.channels.length === 0) {
-    document.body.textContent = "確認データを読み込めませんでした。";
-    return;
+  if (!data?.channels?.length) { document.body.textContent = "確認データを読み込めませんでした。"; return; }
+  const tabs = document.getElementById("channelTabs");
+  const thread = document.getElementById("chatThread");
+  const dialog = document.getElementById("imageDialog");
+  const positions = new Map();
+  let active = -1;
+  function node(tag, cls, text) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text !== undefined) el.textContent = text;
+    return el;
   }
-
-  const elements = {
-    channelTabs: document.getElementById("channelTabs"),
-    deviceOptions: document.getElementById("deviceOptions"),
-    messageIndex: document.getElementById("messageIndex"),
-    messageCount: document.getElementById("messageCount"),
-    phoneShell: document.getElementById("phoneShell"),
-    chatThread: document.getElementById("chatThread"),
-    roomName: document.getElementById("roomName"),
-    datePill: document.getElementById("datePill"),
-    senderAvatar: document.getElementById("senderAvatar"),
-    senderName: document.getElementById("senderName"),
-    messageParts: document.getElementById("messageParts"),
-    imageMessage: document.getElementById("imageMessage"),
-    messageImage: document.getElementById("messageImage"),
-    messageTime: document.getElementById("messageTime"),
-    reviewKicker: document.getElementById("reviewKicker"),
-    reviewTitle: document.getElementById("reviewTitle"),
-    detailTiming: document.getElementById("detailTiming"),
-    detailDate: document.getElementById("detailDate"),
-    detailText: document.getElementById("detailText"),
-    detailAsset: document.getElementById("detailAsset"),
-    prevButton: document.getElementById("prevButton"),
-    nextButton: document.getElementById("nextButton"),
-    imageDialog: document.getElementById("imageDialog"),
-    dialogClose: document.getElementById("dialogClose"),
-    dialogImage: document.getElementById("dialogImage"),
-    dialogCaption: document.getElementById("dialogCaption"),
-  };
-
-  const state = {
-    channelIndex: 0,
-    messageIndex: 0,
-  };
-
-  function currentChannel() {
-    return data.channels[state.channelIndex];
-  }
-
-  function currentMessage() {
-    return currentChannel().messages[state.messageIndex];
-  }
-
-  function channelCountLabel(channel) {
-    const numbered = channel.messages.filter((message) => !message.is_reference_note).length;
-    const notes = channel.messages.length - numbered;
-    return notes ? `${numbered}通＋ノート` : `${numbered}通`;
-  }
-
-  function appendTextWithSafeUrls(target, text) {
-    const urlPattern = /(https?:\/\/[^\s]+)/g;
+  function appendText(target, text) {
     let cursor = 0;
-    let match;
-    while ((match = urlPattern.exec(text)) !== null) {
-      target.appendChild(document.createTextNode(text.slice(cursor, match.index)));
-      const url = document.createElement("span");
-      url.className = "safe-url";
-      url.textContent = match[0];
-      url.title = "確認用のためリンクは無効です";
-      target.appendChild(url);
+    for (const match of text.matchAll(/(https?:\/\/[^\s]+)/g)) {
+      target.append(document.createTextNode(text.slice(cursor, match.index)), node("span", "safe-url", match[0]));
       cursor = match.index + match[0].length;
     }
-    target.appendChild(document.createTextNode(text.slice(cursor)));
+    target.append(document.createTextNode(text.slice(cursor)));
   }
-
-  function buildChannelTabs() {
-    elements.channelTabs.replaceChildren();
-    data.channels.forEach((channel, index) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.role = "tab";
-      button.dataset.channelIndex = String(index);
-      button.setAttribute("aria-selected", String(index === state.channelIndex));
-      button.classList.toggle("is-active", index === state.channelIndex);
-      button.textContent = `${channel.label}\n${channelCountLabel(channel)}`;
-      button.style.whiteSpace = "pre-line";
-      button.addEventListener("click", () => selectChannel(index));
-      elements.channelTabs.appendChild(button);
-    });
-  }
-
-  function buildMessageIndex() {
-    const channel = currentChannel();
-    elements.messageIndex.replaceChildren();
-    elements.messageCount.textContent = channelCountLabel(channel);
-
-    channel.messages.forEach((message, index) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.dataset.messageIndex = String(index);
-      button.classList.toggle("is-active", index === state.messageIndex);
-      button.setAttribute("aria-current", index === state.messageIndex ? "true" : "false");
-
-      const number = document.createElement("span");
-      number.className = "index-number";
-      number.textContent = message.is_reference_note ? "NOTE" : `#${String(message.number).padStart(2, "0")}`;
-
-      const copy = document.createElement("span");
-      copy.className = "index-copy";
-      const strong = document.createElement("strong");
-      strong.textContent = message.timing || "配信タイミング未設定";
-      const date = document.createElement("span");
-      date.textContent = message.date || "日時未設定";
-      copy.append(strong, date);
-      button.append(number, copy);
-      button.addEventListener("click", () => selectMessage(index));
-      elements.messageIndex.appendChild(button);
-    });
-  }
-
-  function renderMessage() {
-    const channel = currentChannel();
-    const message = currentMessage();
-
-    elements.roomName.textContent = channel.room_name;
-    elements.datePill.textContent = message.date || message.timing || "参考ノート";
-    elements.senderName.textContent = channel.sender_name;
-    elements.senderAvatar.textContent = channel.id === "osaru" ? "🐵" : "P";
-    elements.messageParts.replaceChildren();
-
-    message.parts.forEach((part) => {
-      const bubble = document.createElement("div");
-      bubble.className = "message-bubble";
-      appendTextWithSafeUrls(bubble, part);
-      elements.messageParts.appendChild(bubble);
-    });
-
-    if (message.asset) {
-      elements.imageMessage.hidden = false;
-      elements.messageImage.src = message.asset.path;
-      elements.messageImage.alt = message.asset.name;
-      elements.imageMessage.setAttribute("aria-label", `${message.asset.name}を拡大表示`);
-    } else {
-      elements.imageMessage.hidden = true;
-      elements.messageImage.removeAttribute("src");
-      elements.messageImage.alt = "";
-    }
-
-    elements.messageTime.textContent = message.relative_time || "";
-    elements.reviewKicker.textContent = channel.label;
-    elements.reviewTitle.textContent = message.is_reference_note ? "参考ノート" : `配信 #${message.number}`;
-    elements.detailTiming.textContent = message.timing || "未設定";
-    elements.detailDate.textContent = message.date || "未設定";
-    elements.detailText.textContent = `${message.character_count.toLocaleString("ja-JP")}文字・手動改行 ${message.line_break_count.toLocaleString("ja-JP")}箇所`;
-    elements.detailAsset.textContent = message.asset ? message.asset.name : "なし";
-
-    elements.prevButton.disabled = state.messageIndex === 0;
-    elements.nextButton.disabled = state.messageIndex === channel.messages.length - 1;
-    elements.chatThread.scrollTop = 0;
-
-    const hash = `#${message.id}`;
-    if (window.location.hash !== hash) {
-      history.replaceState(null, "", hash);
-    }
-
-    document.querySelectorAll("#messageIndex button").forEach((button, index) => {
-      const active = index === state.messageIndex;
-      button.classList.toggle("is-active", active);
-      button.setAttribute("aria-current", active ? "true" : "false");
-      if (active) {
-        button.scrollIntoView({ block: "nearest", inline: "nearest" });
+  const panels = data.channels.map((channel, index) => {
+    const numbered = channel.messages.filter(m => !m.is_reference_note).length;
+    const tab = node("button", "", channel.label + "\n" + numbered + "通" + (numbered < channel.messages.length ? "＋ノート" : ""));
+    tab.type = "button";
+    tab.id = "tab-" + channel.id;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-controls", "log-" + channel.id);
+    tab.addEventListener("click", () => select(index));
+    tabs.append(tab);
+    const panel = node("div", "channel-log");
+    panel.id = "log-" + channel.id;
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", tab.id);
+    channel.messages.forEach(message => {
+      const article = node("article", "delivery");
+      article.id = message.id;
+      article.setAttribute("aria-label", message.is_reference_note ? "参考ノート" : "配信 " + message.number);
+      article.append(node("div", "date-pill", message.date || message.timing || "参考ノート"));
+      const row = node("div", "message-row");
+      const avatar = node("div", "avatar", channel.id === "osaru" ? "🐵" : "P");
+      avatar.setAttribute("aria-hidden", "true");
+      const stack = node("div", "message-stack");
+      stack.append(node("div", "sender-name", channel.sender_name + " · " + (message.is_reference_note ? "参考ノート" : "#" + String(message.number).padStart(2, "0"))));
+      message.parts.forEach(part => {
+        const bubble = node("div", "message-bubble");
+        appendText(bubble, part);
+        stack.append(bubble);
+      });
+      if (message.asset) {
+        const button = node("button", "image-message");
+        button.type = "button";
+        button.setAttribute("aria-label", message.asset.name + "を拡大表示");
+        const img = node("img");
+        img.src = message.asset.path; img.alt = message.asset.name;
+        img.loading = "lazy"; img.decoding = "async";
+        button.append(img, node("span", "image-zoom-hint", "拡大"));
+        button.addEventListener("click", () => {
+          document.getElementById("dialogImage").src = message.asset.path;
+          document.getElementById("dialogCaption").textContent = message.asset.name;
+          dialog.showModal();
+        });
+        stack.append(button);
       }
+      stack.append(node("div", "message-time", message.relative_time || ""));
+      row.append(avatar, stack); article.append(row); panel.append(article);
     });
+    panel.append(node("p", "log-end", "ここまでが" + channel.label + "の全配信です"));
+    thread.append(panel);
+    return panel;
+  });
+  function select(index, requestedId) {
+    if (active >= 0) positions.set(active, window.scrollY);
+    active = index;
+    panels.forEach((panel, i) => { panel.hidden = i !== index; });
+    Array.from(tabs.children).forEach((tab, i) => {
+      tab.classList.toggle("is-active", i === index);
+      tab.setAttribute("aria-selected", String(i === index));
+    });
+    document.getElementById("roomName").textContent = data.channels[index].room_name;
+    history.replaceState(null, "", "#" + (requestedId || data.channels[index].id));
+    if (requestedId && document.getElementById(requestedId)) document.getElementById(requestedId).scrollIntoView({block: "start"});
+    else window.scrollTo(0, positions.get(index) || 0);
   }
-
-  function selectChannel(index, requestedMessageId) {
-    state.channelIndex = index;
-    const channel = currentChannel();
-    const requestedIndex = requestedMessageId
-      ? channel.messages.findIndex((message) => message.id === requestedMessageId)
-      : -1;
-    state.messageIndex = requestedIndex >= 0 ? requestedIndex : 0;
-    buildChannelTabs();
-    buildMessageIndex();
-    renderMessage();
+  function fromHash() {
+    const id = location.hash.slice(1);
+    const index = data.channels.findIndex(c => c.id === id || c.messages.some(m => m.id === id));
+    select(index >= 0 ? index : 0, id.includes("-") ? id : undefined);
   }
-
-  function selectMessage(index) {
-    state.messageIndex = index;
-    renderMessage();
-  }
-
-  function selectFromHash() {
-    const requestedId = window.location.hash.slice(1);
-    if (!requestedId) {
-      selectChannel(0);
-      return;
-    }
-    const channelIndex = data.channels.findIndex((channel) =>
-      channel.messages.some((message) => message.id === requestedId),
-    );
-    selectChannel(channelIndex >= 0 ? channelIndex : 0, requestedId);
-  }
-
-  elements.deviceOptions.addEventListener("click", (event) => {
+  document.getElementById("deviceOptions").addEventListener("click", event => {
     const button = event.target.closest("button[data-width]");
     if (!button) return;
-    const width = button.dataset.width;
-    elements.phoneShell.style.setProperty("--device-width", `${width}px`);
-    elements.deviceOptions.querySelectorAll("button").forEach((option) => {
-      option.classList.toggle("is-active", option === button);
-    });
+    document.getElementById("phoneShell").style.setProperty("--device-width", button.dataset.width + "px");
+    document.querySelectorAll("#deviceOptions button").forEach(option => option.classList.toggle("is-active", option === button));
   });
-
-  elements.prevButton.addEventListener("click", () => {
-    if (state.messageIndex > 0) selectMessage(state.messageIndex - 1);
-  });
-
-  elements.nextButton.addEventListener("click", () => {
-    if (state.messageIndex < currentChannel().messages.length - 1) {
-      selectMessage(state.messageIndex + 1);
-    }
-  });
-
-  elements.imageMessage.addEventListener("click", () => {
-    const message = currentMessage();
-    if (!message.asset) return;
-    elements.dialogImage.src = message.asset.path;
-    elements.dialogCaption.textContent = message.asset.name;
-    elements.imageDialog.showModal();
-  });
-
-  elements.dialogClose.addEventListener("click", () => elements.imageDialog.close());
-  elements.imageDialog.addEventListener("click", (event) => {
-    if (event.target === elements.imageDialog) elements.imageDialog.close();
-  });
-
-  window.addEventListener("hashchange", selectFromHash);
-  selectFromHash();
+  document.getElementById("dialogClose").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
+  window.addEventListener("hashchange", fromHash);
+  fromHash();
 })();

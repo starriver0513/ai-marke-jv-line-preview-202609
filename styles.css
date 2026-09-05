@@ -776,3 +776,24 @@ h1 {
     transition: none !important;
   }
 }
+
+/* Continuous log: the document itself scrolls through every delivery. */
+.timeline-view .workspace { grid-template-columns: minmax(240px, 300px) minmax(0, 460px); max-width: 900px; justify-content: center; }
+.timeline-view .control-panel { position: sticky; top: 28px; min-width: 0; }
+.timeline-view h1 { font-size: 2.35rem; line-height: 1.15; }
+.timeline-view .channel-tabs button { white-space: pre-line; min-width: 0; }
+.timeline-view .preview-stage { min-width: 0; }
+.timeline-view .phone-shell { height: auto; min-height: 0; overflow: visible; border: 0; border-radius: 18px; box-shadow: none; }
+.timeline-view .line-header { display: block; padding: 14px 10px; border-radius: 18px 18px 0 0; }
+.timeline-view .chat-thread { overflow: visible; overscroll-behavior: auto; flex: none; }
+.timeline-view .channel-log[hidden] { display: none; }
+.timeline-view .delivery { margin-bottom: 42px; scroll-margin-top: 112px; }
+.timeline-view .message-stack { width: calc(100% - 68px); max-width: calc(100% - 68px); }
+.timeline-view .log-end { text-align: center; color: white; font-size: 12px; padding: 20px 0; }
+@media (max-width: 720px) {
+  .timeline-view .workspace { width: 100%; display: block; }
+  .timeline-view .control-panel { position: sticky; top: 0; z-index: 10; padding: 8px 10px; background: #071321; }
+  .timeline-view .channel-tabs { margin: 0; }
+  .timeline-view .phone-shell { width: 100% !important; height: auto; min-height: 0; border-radius: 0; }
+  .timeline-view .line-header { border-radius: 0; }
+}
